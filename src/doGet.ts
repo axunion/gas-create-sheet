@@ -1,7 +1,5 @@
 type GetResponse = {
-	result: "done" | "error";
-	data?: unknown;
-	error?: string;
+	result: "done" | "error" | "expired";
 };
 
 function _doGet() {
@@ -22,10 +20,20 @@ function doGet(
 			throw new Error("Invalid parameter.");
 		}
 
-		response.data = type;
-	} catch (error) {
+		const properties = PropertiesService.getScriptProperties().getProperties();
+		const configSheetId = properties.SPREADSHEET_ID_CONFIG;
+
+		if (!configSheetId) {
+			throw new Error("Invalid script properties.");
+		}
+
+		const config = getConfig(configSheetId, type);
+
+		if (new Date() > config.dueDate) {
+			response.result = "expired";
+		}
+	} catch {
 		response.result = "error";
-		response.error = error.message;
 	}
 
 	return ContentService.createTextOutput(JSON.stringify(response));
