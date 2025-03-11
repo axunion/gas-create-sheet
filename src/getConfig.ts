@@ -1,6 +1,5 @@
 type Config = {
 	dueDate: Date;
-	sheetId: string;
 	spreadsheetId: string;
 	directoryId: string;
 };
@@ -27,9 +26,8 @@ function getConfig(sheetId: string, type: string): Config {
 	}
 
 	return {
-		dueDate: row[1],
-		sheetId: row[2].trim(),
-		spreadsheetId: row[3].trim(),
-		directoryId: row[4].trim(),
+		dueDate: row[1].trim(),
+		spreadsheetId: row[2].trim(),
+		directoryId: row[3].trim(),
 	};
 }
