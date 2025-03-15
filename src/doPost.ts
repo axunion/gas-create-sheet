@@ -33,8 +33,8 @@ function doPost(
 			throw new Error("This form has expired.");
 		}
 
-		const copiedFile = duplicateTemplateFile({
-			spreadsheetId: config.spreadsheetId,
+		const copiedFile = duplicateFile({
+			fileId: config.spreadsheetId,
 			directoryId: config.directoryId,
 			name,
 		});
