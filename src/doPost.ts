@@ -1,13 +1,19 @@
-type PostResponse = {
-	result: "done" | "error";
-	url?: string;
-	error?: string;
+type PostSuccessResponse = {
+	result: "done";
+	url: string;
 };
+
+type PostErrorResponse = {
+	result: "error";
+	error: string;
+};
+
+type PostResponse = PostSuccessResponse | PostErrorResponse;
 
 function doPost(
 	e: GoogleAppsScript.Events.DoPost,
 ): GoogleAppsScript.Content.TextOutput {
-	const response: PostResponse = { result: "done" };
+	let response: PostResponse;
 
 	try {
 		const parameter = JSON.parse(e.postData.contents);
@@ -43,10 +49,15 @@ function doPost(
 			throw new Error("Failed to duplicate the template file.");
 		}
 
-		response.url = copiedFile.getUrl();
+		response = {
+			result: "done",
+			url: copiedFile.getUrl(),
+		};
 	} catch (error) {
-		response.result = "error";
-		response.error = error.message;
+		response = {
+			result: "error",
+			error: error.message,
+		};
 	}
 
 	return ContentService.createTextOutput(JSON.stringify(response));
