@@ -33,12 +33,6 @@ function doPost(
 		}
 
 		const config = getConfig(configSheetId, type);
-		const date = new Date();
-
-		if (date > config.dueDate) {
-			throw new Error("This form has expired.");
-		}
-
 		const copiedFile = duplicateFile({
 			fileId: config.spreadsheetId,
 			directoryId: config.directoryId,

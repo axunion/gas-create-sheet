@@ -1,5 +1,4 @@
 type Config = {
-	dueDate: Date;
 	spreadsheetId: string;
 	directoryId: string;
 };
@@ -19,15 +18,14 @@ function getConfig(sheetId: string, type: string): Config {
 	}
 
 	const data = sheet.getDataRange().getValues();
-	const row = data.find((row) => row[0] === type);
+	const item = data.slice(1).find((row) => !row[0] && row[1] === type);
 
-	if (!row) {
+	if (!item) {
 		throw new Error("Config not found.");
 	}
 
 	return {
-		dueDate: row[1].trim(),
-		spreadsheetId: row[2].trim(),
-		directoryId: row[3].trim(),
+		spreadsheetId: item[2].trim(),
+		directoryId: item[3].trim(),
 	};
 }
