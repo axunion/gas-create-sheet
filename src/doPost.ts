@@ -10,6 +10,12 @@ type PostErrorResponse = {
 
 type PostResponse = PostSuccessResponse | PostErrorResponse;
 
+function _doPost() {
+	const e = { parameter: { type: "" } };
+	const result = doPost(e as unknown as GoogleAppsScript.Events.DoPost);
+	console.log(result.getContent());
+}
+
 function doPost(
 	e: GoogleAppsScript.Events.DoPost,
 ): GoogleAppsScript.Content.TextOutput {
@@ -33,7 +39,7 @@ function doPost(
 		}
 
 		const config = getConfig(configSheetId, type);
-		const copiedFile = duplicateFile({
+		const copiedFile = _duplicateFile({
 			fileId: config.spreadsheetId,
 			directoryId: config.directoryId,
 			name,

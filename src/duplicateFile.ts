@@ -8,7 +8,7 @@
  * @returns The Google Apps Script Drive File object representing the duplicated file.
  * @throws Error if `fileId`, `directoryId`, or `name` is empty, if the original file or target folder is not found or inaccessible, or if there is an error during the duplication process (e.g., naming conflict, insufficient permissions).
  */
-function duplicateFile(params: {
+function _duplicateFile(params: {
 	fileId: string;
 	directoryId: string;
 	name: string;
