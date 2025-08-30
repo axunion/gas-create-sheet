@@ -1,80 +1,174 @@
 # GAS Create Sheet
 
-A Google Apps Script (GAS) web application that creates copies of Google Sheets templates based on user requests. This service processes POST requests and duplicates predefined spreadsheet templates to specific Google Drive folders.
+Simple Google Apps Script (GAS) web API to create a copy of a Google Sheets template based on a requested type. It returns the URL of the new sheet.
 
 ## Features
 
-- 📝 Duplicate Google Sheets templates via web API
-- 🔐 reCAPTCHA integration for spam protection
-- ⏰ Configurable expiration dates for forms
-- 📂 Organized file management with Google Drive folders
-- 🔧 Configuration management via Google Sheets
+- Duplicate a template sheet by type
+- Store template + target folder mapping in a config sheet
+- Simple JSON POST interface
+- Clear error responses
+
+## Tech
+
+- TypeScript (compiled to plain Google Apps Script JS)
+- No external runtime libraries
+- Biome for format / lint
 
 ## Project Structure
 
 ```
 src/
-├── appsscript.json      # Google Apps Script configuration
-├── doPost.ts            # Main POST request handler
-├── duplicateFile.ts     # File duplication functionality
-├── getConfig.ts         # Configuration retrieval from sheets
-└── verifyRecaptcha.ts   # reCAPTCHA verification (utility)
+├── appsscript.json   # GAS manifest (copied to dist on build)
+├── doPost.ts         # Entry point (web app POST)
+├── duplicateFile.ts  # Drive file copy helper
+└── getConfig.ts      # Read config sheet
 ```
+
+Build output goes to `dist/` after `npm run build`.
 
 ## Prerequisites
 
-- Google Account with access to Google Apps Script
-- Google Drive API enabled
-- Google Sheets API enabled
-- reCAPTCHA keys (for spam protection)
+- Google account + access to Apps Script and Drive
+- One Google Sheet used as a config sheet (tab name: `config`)
 
-## Setup
+Script Properties required (must be set even if value is just placeholders in current code):
+- `SPREADSHEET_ID_CONFIG`: ID of the config spreadsheet
+- `RECAPTCHA_SECRET`: Currently not used in logic, but code checks it exists
 
-### 1. Google Apps Script Project
+## Config Sheet Format
 
-1. Create a new Google Apps Script project
-2. Replace the default code with the TypeScript files from this repository
-3. Set the appropriate time zone in `appsscript.json`
+Sheet name: `config`
 
-### 2. Script Properties
+Header row (row 1): any labels. From row 2 downward:
 
-Set the following script properties in your GAS project:
+| A (expired flag) | B (type)       | C (spreadsheetId)    | D (directoryId)      |
+| ---------------- | -------------- | -------------------- | -------------------- |
+| (empty / FALSE)  | form_type_1    | template_sheet_id    | target_folder_id     |
+| (empty / FALSE)  | form_type_2    | another_template_id  | another_folder_id    |
 
-- `RECAPTCHA_SECRET`: Your reCAPTCHA secret key
-- `SPREADSHEET_ID_CONFIG`: ID of the configuration spreadsheet
+Row is selected when:
+1. Column A is empty / not truthy (e.g. unchecked checkbox)
+2. Column B matches the requested `type`
 
-### 3. Configuration Spreadsheet
+Returned values supply the template file ID (column C) and target folder ID (column D).
 
-Create a Google Sheets file with a "config" sheet containing:
+## Install & Build
 
-| Column A (expired) | Column B (type) | Column C (spreadsheetId) | Column D (directoryId) |
-|---------------------|-----------------|-------------------------|------------------------|
-| ☐                   | form_type_1     | template_sheet_id       | target_folder_id       |
-| ☐                   | form_type_2     | another_template_id     | another_folder_id      |
+```bash
+npm install
+npm run build
+```
 
-Note: Column A should contain checkboxes (unchecked), and the type identifier goes in Column B.
+This compiles TypeScript (`src/*.ts`) into `dist/*.js` and copies `appsscript.json` to `dist/`.
 
-### 4. Deploy as Web App
+## Deploy (clasp)
 
-1. In Google Apps Script, click "Deploy" → "New deployment"
-2. Choose "Web app" as the type
-3. Set execute permissions appropriately
-4. Copy the web app URL for use in your frontend
+Deployment to Google Apps Script uses `clasp`. Only the `dist/` directory is pushed (`rootDir` in `.clasp.json`).
 
-## API Usage
+### 1. Install & initial auth
 
-### POST Request
+```bash
+npm install
+npm run build   # generate dist/
+npm install -g @google/clasp
+clasp login     # browser auth
+```
 
-Send a POST request to your deployed web app URL with the following JSON payload:
+### 2. Build & push
 
+```bash
+npm run build      # TypeScript -> dist
+clasp push         # Upload dist/ JS + manifest
+```
+
+Fast edit loop:
+```bash
+npm run build && clasp push
+```
+
+Optional convenience script (add to `package.json`):
+```jsonc
+"scripts": {
+  // ...existing
+  "push": "npm run build && clasp push"
+}
+```
+
+### 3. Publish as a Web App
+
+First time only (needs the Apps Script UI):
+
+1. `clasp open`
+2. Deploy > New deployment
+3. Type: Web app
+4. Execute as: Me (default)
+5. Who has access: choose appropriate scope (Anyone / Domain / Only myself)
+6. Deploy and copy the Web App URL
+
+Subsequent releases:
+```bash
+npm run build
+clasp push
+clasp deploy --description "update YYYY-MM-DD"
+```
+
+If you just need the latest code without versioning, use the “test deployment” URL (not recommended for production stability).
+
+`doPost` currently parses JSON even without a header, but clients should send `Content-Type: application/json`.
+
+### 4. Script Properties
+
+Apps Script > Project Settings > Script properties:
+
+| Key | Example | Note |
+| --- | ------- | ---- |
+| `SPREADSHEET_ID_CONFIG` | `1Abc...` | Config spreadsheet ID |
+| `RECAPTCHA_SECRET` | `dummy` | Only presence-checked for now |
+
+Property changes take effect immediately; you don't need to redeploy.
+
+### 5. Test (curl)
+
+```bash
+WEBAPP_URL="https://script.google.com/macros/s/XXXXXXXXXXXXXXXX/exec"
+curl -s -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"type":"form_type_1","name":"Sample Sheet"}' \
+  "$WEBAPP_URL" | jq .
+```
+
+Successful response:
+```json
+{"result":"done","url":"https://docs.google.com/spreadsheets/d/..."}
+```
+
+Error example (no matching config row):
+```json
+{"result":"error","error":"Config not found."}
+```
+
+### 6. Common pitfalls
+
+- Forgot to build: editing `src/` without rebuilding leaves `dist/` stale
+- Reusing someone else's `scriptId`: accidentally overwriting another project
+- Config sheet name is fixed (`config`)
+- Header row: first row ignored; data starts at row 2
+- Expired flag: any truthy value in column A skips the row
+
+---
+
+## API
+
+Endpoint: Web App URL (POST JSON)
+
+Request body:
 ```json
 {
   "type": "form_type_1",
   "name": "New Sheet Name"
 }
 ```
-
-### Response
 
 Success response:
 ```json
@@ -88,61 +182,21 @@ Error response:
 ```json
 {
   "result": "error",
-  "error": "Error message"
+  "error": "Message"
 }
 ```
 
-## Development
+## Error Cases
 
-### Requirements
-
-- Node.js (for development tools)
-- TypeScript
-- Biome (for formatting and linting)
-
-### Install Dependencies
-
-```bash
-npm install
-```
-
-### Available Scripts
-
-```bash
-# Format code
-npm run format
-
-# Format and write changes
-npm run format:write
-
-# Lint code
-npm run lint
-
-# Lint and auto-fix
-npm run lint:write
-
-# Check both formatting and linting
-npm run check
-
-# Check and auto-fix
-npm run check:write
-```
-
-## Error Handling
-
-The application handles various error scenarios:
-
-- Invalid or missing parameters
+- Missing or empty `type` / `name`
 - Missing script properties
-- Expired forms (past due date)
-- File duplication failures
-- Configuration retrieval errors
+- Config row not found
+- File or folder not found / copy failure
 
-All errors are returned as JSON responses with descriptive error messages.
+All errors return JSON with `result: "error"`.
 
-## Security Considerations
+## Security Notes
 
-- reCAPTCHA integration helps prevent automated abuse
-- Form expiration dates limit the window of vulnerability
-- Proper error handling prevents information leakage
-- Script properties keep sensitive data secure
+- Only the folder you target receives new copies
+- Script properties keep IDs (and future secrets) out of code
+- Add validation (e.g. reCAPTCHA) before production if needed
